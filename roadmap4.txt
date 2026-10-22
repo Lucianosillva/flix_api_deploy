@@ -1,0 +1,192 @@
+Autenticação por JWT
+
+
+******** o que é Autenticação por jwt...
+
+o usuário cadastrado envia uma requisição, o django faz a verificação e gera um token para o usuáro acessar a aplicação. A partir daí ele precisa usar o access token gerado para acessar os recursos da api, o django verifica se o token é válido e se não ta expirado e libera o acesso.
+
+
+
+############################################################################
+
+Implementando autenticação JWT na nossa Api
+
+instale o simplejwt...
+
+
+pip install djangorestframework-simplejwt
+
+
+add no instaled_apps do settings...
+
+'rest_framework_simplejwt'
+
+
+crie um app chamado authentication e pode excluir dele: views, tests, models, no caso a view a ser usada será do simplejwt...
+
+
+
+add no instaled_apps do settings...
+
+registre este app criado...
+
+'authentication'
+
+
+crie nele urls.py, com...
+
+
+from django.urls import path
+from rest_framework_simplejwt.views import TokenObtainPairView 
+
+
+urlpatterns = [
+    path('authentication/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+]
+
+inclua ela na urls raiz...
+
+
+no settings inclua esta configuração que pode ser encontrada em https://django-rest-framework-simplejwt.readthedocs.io/en/latest/getting_started.html
+
+
+ela informa que o tipo de autenticação a ser usada é o simple_jwt...
+
+
+REST_FRAMEWORK = {
+    
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+    
+}
+
+
+no endpoint de admin crie um usuário comum...
+
+pronto, agora a aplicação já pode gerar token (com validade de 5 min, que pode ser alterada...), dando um post em http://127.0.0.1:8000/api/v1/authentication/token/ (tanto na interface gráfica do drf ou no postman) e passando usuario e senha do user criado acima (pode ser superuser também) porém os endpoints ainda não estão protegidos, ou seja, ainda temos acesso sem usar token.
+
+
+{
+    "username": "teste1",
+    "password": "12345Teste@!"
+}
+
+
+e vai retornar tipo...
+
+
+
+{
+    "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc5MDc2NTU4MSwiaWF0IjoxNzkwNjc5MTgxLCJqdGkiOiIxY2IzYmI3MDE4MDg0NmIyOTU4NzRjYTgzNTUwYTUyZSIsInVzZXJfaWQiOiIyIn0.3DVNs2iV1zsy04UTZ83w-8CK6yQkFxdqnhEFw8W9pRw",
+    "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzkwNjc5NDgxLCJpYXQiOjE3OTA2NzkxODEsImp0aSI6ImZhNzI1OGJlNzYzNjQxYmE4ZTA0NTExZjliZWFmZmI0IiwidXNlcl9pZCI6IjIifQ.f05EfJHzmd0n20J5LUhJ5ofkuQgoXucUsPKWUJTQjVk"
+}
+
+
+e para usar...
+
+no endpoint que precisar vá em authorization, bearer token, cole o access, pra finalizar send...
+
+
+
+
+############################################################################################
+
+
+Protegendo nossos endpoints
+
+vamos proteger através da views...
+
+nas views de cada app, exceto authentication...
+
+from rest_framework.permissions import IsAuthenticated
+
+
+na view na segunda linha...
+
+permission_classes = (IsAuthenticated,)
+
+
+feito isso os endpoints só podem ser acessados com token, e só no postman...
+
+
+###########################################################################################
+
+
+Verify e Refresh Token
+
+
+
+Verify serve para ver se o token ainda é válido, ou seja, se ainda tá na validade de 5 minutos...
+
+
+
+nas urls de authentication...
+
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView, TokenVerifyView
+
+   
+    path('token/verify/', TokenVerifyView.as_view(), name='token_verify'),
+
+no postman, na url de verify passe no corpo da requisição post, raw, json...
+
+
+{
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzkwNjc5NDgxLCJpYXQiOjE3OTA2NzkxODEsImp0aSI6ImZhNzI1OGJlNzYzNjQxYmE4ZTA0NTExZjliZWFmZmI0IiwidXNlcl9pZCI6IjIifQ.f05EfJHzmd0n20J5LUhJ5ofkuQgoXucUsPKWUJTQjVk"
+}
+
+
+
+Refresh serve para dar refresh (que dura 24 horas, depois disso tem que gerar um novo token) no token gerado...
+
+
+
+ainda nas urls de authentication...
+
+
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView, TokenVerifyView
+
+
+ path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+
+
+
+no postman, na url de refresh passe no corpo da requisição post, raw, json...
+
+{
+    "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc5MDc2NTU4MSwiaWF0IjoxNzkwNjc5MTgxLCJqdGkiOiIxY2IzYmI3MDE4MDg0NmIyOTU4NzRjYTgzNTUwYTUyZSIsInVzZXJfaWQiOiIyIn0.3DVNs2iV1zsy04UTZ83w-8CK6yQkFxdqnhEFw8W9pRw"
+}
+
+
+feito isso ele vai gerar um novo token com validade de 5 min., isso pode ser repetido durante 24 horas que é a validade do refresh.
+
+
+
+#############################################################################################
+
+
+Configurações personalizadas do Simple JWT
+
+no settings do projeto...
+
+
+
+from datetime import timedelta
+
+# sobreescrevendo algumas configurações do jwt...
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(hours=12),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
+}
+
+
+
+
+
+
+
+
+
+

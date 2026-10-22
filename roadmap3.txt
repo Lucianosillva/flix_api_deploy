@@ -1,0 +1,91 @@
+Serializers
+
+
+*************** ModelSerializer e validações...
+
+Um ModelSerializer usa os campos do model, se fosse um serializer teríamos que escrever campo a campo e com seus devidos tipos...
+
+
+dentro do ModelSerializer de movies vamos criar validações, essas validações são mais persoalizdas do que as validações a nivel de model (como por exemplo o validator no model review).
+
+sendo assim as validações (crie dentro da classe) do ModelSerializer de movies fica assim...
+
+# validações...
+    def validate_release_date(self, value):
+        if value.year < 1990:
+            raise serializers.ValidationError('A data de lançamento não pode ser inferior a 1990')
+        return value
+    
+    def validate_resume(self, value):
+        if len(value) > 200:
+            raise serializers.ValidationError('O tamanho máximo deste campo deve ser 200 caracteres.')
+        return value
+
+
+############################################################################################
+
+ SerializerMethodField (Campos calculados)
+
+
+ A ideia é criar (no serializer de movies) um campo (do tipo SerializerMethodField que é um campo calculado) rate (média) e esse campo será somente leitura (read_only=True), ou seja, não salva no banco de dados...
+
+adicione este campo...
+
+rate = serializers.SerializerMethodField(read_only=True)
+
+e depois do class Meta...
+
+# método para retornar o valor de rate...
+    def get_rate(self, obj):
+        return 5 # retorno fixo por enquanto...
+
+
+#############################################################################################
+
+Calculando rate (na mão)...
+
+# método para retornar o valor de rate...
+    def get_rate(self, obj):
+        reviews = obj.reviews.all()
+        
+        if reviews:
+            sum_reviews = 0
+            for review in reviews:
+                sum_reviews += review.stars
+                
+            reviews_count = reviews.count()
+            
+            return round(sum_reviews / reviews_count, 1)
+        
+        return None
+
+
+#########################################################################################
+
+
+Rate com Aggregate e Avg
+
+
+importe from django.db.models import Avg
+
+
+# método para retornar o valor de rate...
+    def get_rate(self, obj):
+        # aggregate cria um campo a mais, no caso stars__avg
+        # ['stars__avg'] o ORM cria uma variável com o nome do campo dunder avg e retorna somente ele
+        # rate busca no model Review related_name='reviews' o campo stars
+        rate = obj.reviews.aggregate(Avg('stars'))['stars__avg']
+        
+        if rate:
+            return round(rate, 1)
+        return None
+
+
+
+
+
+
+
+
+
+

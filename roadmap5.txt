@@ -1,0 +1,205 @@
+Permissões de usuários - Criando classe de permissão...
+
+As permissões no django são implementadas no código e depois gerenciadas no admin, e baseadas em métodos (crud) (e em cada model) em cada usuário comum (o super pode fazer tudo e não precisa explicitar) existente no admin.
+
+Um exemplo seria um user que só visualiza, (ou utiliza só os safe methods que são get, option, head, ou seja, só consume dados, não altera...) outro que visualiza e altera (exceto tabelas do sistema) que seria um admin, e não um superuser...
+
+
+##############################################################################################
+
+Criando classe de permissão
+
+como exemplo vamos criar uma classe de permissão no app genres...
+
+dentro de genres crie permissions.py, e dentro...
+
+
+from rest_framework import permissions
+
+
+class GenrePermissionClass(permissions.BasePermission):
+    
+    def has_permission(self, request, view):
+        # aqui vai a lógica para liberar a permissão ou não...
+        return True
+
+
+na view de genres importe...
+
+from genres.permissions import GenrePermissionClass
+
+e dentro da classe GenreCreateListView...
+
+na permission_classes acrescente = (GenrePermissionClass)
+
+pronto agora essa view pra ser acessada precisa estar autenticada (com IsAuthenticated) e ter permissão (com GenrePermissionClass), e como deixamos a GenrePermissionClass sem condição e retornando True podemos acessar o endpoint... 
+
+
+na permission_classes podem ser add quantas regras quiser...
+
+
+#######################################################################################
+
+Implementando lógica de permissões
+
+
+dentro de permissions.py...
+
+
+na classe GenrePermissionClass...
+
+
+def has_permission(self, request, view):
+        if request.method in ['GET', 'OPTIONS', 'HEAD']: # safe methods...
+            # nome_app.método a ser executado_nome do model (minúsculo pq está assim no admin)
+            return request.user.has_perm('genres.view_genre')
+        
+        if request.method == 'POST':
+            return request.user.has_perm('genres.add_genre')
+        
+        return False # padrão
+
+
+proteja também a view GenreRetrieveUpdateDestroyView...
+
+na permission_classes acrescente = (GenrePermissionClass)
+
+
+no admin altere as permissões do usuário teste1...
+
+Can view genre
+Can add genre
+
+
+com isso o usuário teste1 pode visualizar e add no model genre...
+
+
+
+#############################################################################
+
+
+Configurando permissões nos endpoints
+
+
+ainda dentro de permissions.py...
+
+
+na classe GenrePermissionClass...
+
+dentro de def has_permission...
+
+        if request.method in ['PATCH', 'PUT']:
+            return request.user.has_perm('genres.change_genre')
+        
+        if request.method == 'DELETE':
+            return request.user.has_perm('genres.delete_genre')
+
+no admin add...
+
+Can change genre
+Can delete genre
+
+
+com isso o model genre pode executar todos o métodos CRUD... de um jeito hard code, a seguir veremos como implementar essas permissões em todos os apps do projeto de um jeito dinâmico...
+
+
+##########################################################################################
+
+
+Criando classe global de permissões
+
+
+vamos criar uma classe global de permissões que será usada no projeto inteiro, em todos os apps e models...
+a lógica será a mesma que foi criada em genres, porém será genérico, ou seja, pode ser usada em todos os apps...
+
+o permissions de genres pode comentar ou deletar que não vamos mais usar ele...
+
+
+dentro de app crie permissions.py...
+
+que tera...
+
+
+
+from rest_framework import permissions
+
+
+class GlobalDefaultPermission(permissions.BasePermission):
+    
+    # função principal...
+    def has_permission(self, request, view):
+        model_permission_codename = self.__get_model_permission_codename(
+            method=request.method,
+            view=view,
+        )
+        
+        if not model_permission_codename:
+            return False
+        
+        return request.user.has_perm(model_permission_codename)
+    
+    # para montar a string, tipo (genres.view_genre) (app_name.ação_model_name)
+    def __get_model_permission_codename(self, method, view):
+        try:
+            app_label = view.queryset.model._meta.app_label
+            action = self.__get_action_sufix(method)
+            model_name = view.queryset.model._meta.model_name
+            return f'{app_label}.{action}_{model_name}'
+            
+        except AttributeError:
+            return None
+    
+    # saber qual método está chegando...
+    def __get_action_sufix(self, method):
+        method_actions = {
+            'GET': 'view',
+            'OPTIONS': 'view',
+            'HEAD': 'view', 
+            'POST': 'add',
+            'PUT': 'change',
+            'PATCH': 'change',
+            'DELETE': 'delete',
+            
+        }
+        return method_actions.get(method, '')
+
+
+
+##################################################################################
+
+
+ Implementando classe global de permissões
+
+
+ dentro das views de cada app...
+
+ troque...
+
+ # from genres.permissions import GenrePermissionClass
+
+ por...
+
+ from app.permissions import GlobalDefaultPermission
+
+
+ e em cada endpoint use a GlobalDefaultPermission ao invés da permission personalizada (GenrePermissionClass)... 
+
+ permission_classes = (IsAuthenticated, GlobalDefaultPermission)
+
+
+ feito isso todos as permissions em todos os endpoints, em todos os apps estaram funcionando desde que configuradas as permissions no admin...
+
+
+###########################################################################################
+
+
+ Configurando grupos de usuários e permissões
+
+
+ como exemplo vamos criar um grupo chamado regular_user que só visualiza ou seja Can view, e outro chamado admin_user que faz CRUD completo nas entidades do sistema (exceto tabelas de sistema)...
+
+ depois de criado o grupo vá no usuário escolhido, limpe todas as permissões que ele tiver para não dar conflito, ou seja, controle as permissões no grupo, e add o grupo nele, assim ele herda a permissões que estão naquele grupo, ou grupos...
+
+
+
+

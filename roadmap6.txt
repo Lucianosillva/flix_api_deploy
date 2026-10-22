@@ -1,0 +1,330 @@
+Além do CRUD
+ 
+
+ Endpoint de estatísticas (parte 1)
+
+ no caso de movies (quantidade de filmes, cadastrados, quantidade estrelas, etc.)
+
+
+ não vamos usar as generics view, vamos usar uma view bem básica (ApiView) que pode ser manipulada do jeito que precisarmos, ou seja, ela não faz nada automático...
+
+
+ nas urls de movies...
+
+ importe MovieStatsView
+
+ crie...
+
+ path('movies/stats/', MovieStatsView.as_view(), name='movie-stats-view'),
+
+
+ nas views de movies...
+
+
+ from rest_framework import generics, views, response, status
+
+class MovieStatsView(views.APIView):
+    permission_classes = (IsAuthenticated, GlobalDefaultPermission)
+    queryset = Movie.objects.all()
+    
+    
+    def get(self, request):
+        # resposta fixa, só para testar...
+        return response.Response(
+            data={'message': 'funcionou'},
+            status=status.HTTP_200_OK,
+        )
+        
+
+#####################################################################################
+
+
+ Endpoint de estatísticas (parte 2)
+
+
+ na view criada anteriormente...
+
+ from django.db.models import Count, Avg
+ from reviews.models import Review
+
+ 
+
+e atualize para...
+
+ class MovieStatsView(views.APIView):
+    permission_classes = (IsAuthenticated, GlobalDefaultPermission)
+    queryset = Movie.objects.all()
+    # não precisa de serializer pq os dados já vão ser serializados manualmente...
+    
+    
+    def get(self, request):
+        total_movies = self.queryset.count()
+        # values, retorna o nome do gênero
+        # annotate, retorna uma query com algum dado extra
+        movies_by_genre = self.queryset.values('genre__name').annotate(count=Count('id'))
+        total_reviews = Review.objects.count()
+        average_stars = Review.objects.aggregate(avg_stars=Avg('stars'))['avg_stars']
+        
+        return response.Response(data=
+            {'total_movies': total_movies,
+             'movies_by_genre': movies_by_genre,
+             'total_reviews': total_reviews,
+             'average_stars': round(average_stars, 1) if average_stars else 0,
+            }, status=status.HTTP_200_OK,
+            
+        )
+
+
+##########################################################################################
+
+
+requirements.txt e requirements_dev.txt
+
+
+############## requirements.txt são as libs que projeto precisa para funcionar, vale lembrar que algumas libs que instalamos tem sua próprias dependencias e aparecem também...
+
+
+############ requirements_dev.txt são as libs que são usadas durante o desenvolvimento, ou seja, não precisam ser instaladas quando baixar um projeto ou num servidor depois do deploy...
+
+
+o ideal quando for separar entre os dois é copiar e colar cada conteúdo...
+
+
+###########################################################################################
+
+Backend For Frontend e Api Gateway
+
+
+Numa API RestFul os dados serializados são devolvidos de forma crua, ou seja, listando filmes retornaria os nomes deles, e retorna os ids dos atores ao invés de retornar o nome, depois para saber teria que fazer outro get em atores, para tratar isso e deixar as respostas mais amigáveis para os usuários (Frontend) existe o Api Gateway. Mas para implementar um Api Gateway precisa montar uma grande estrutura e a maioria não usam isso, e ao ínves disso, na vida real, esse tratamento é montado na própria api.
+
+Como exemplo vamos montar no app movies uma estrutura que mostra por exemplo uma lista de atores ao invés de ids, e fazendo isso a api vai sair um pouco do padrão RestFul, mas na prática é assim mesmo...
+
+
+
+nas views de movies...
+
+
+from movies.serializers import MovieSerializer, MovieListDetailSerializer
+
+
+class MovieCreateListView(generics.ListCreateAPIView):
+    permission_classes = (IsAuthenticated, GlobalDefaultPermission)
+    queryset = Movie.objects.all()
+    # serializer_class = MovieSerializer
+    
+    # verifica qual método ta chegando e escolhe qual serializer usar...
+    def get_serializer_class(self):
+        if self.request.method == 'GET':
+            return MovieListDetailSerializer
+        # se for post usa o serializer normal, sem personalização...
+        return MovieSerializer
+
+
+no serializers de movies...
+
+# para tratar os dados para o front-end...   
+class MovieListDetailSerializer(serializers.ModelSerializer):
+    
+    class Meta:
+        model = Movie
+        fields = '__all__'
+
+
+
+###############################################################################################
+
+
+Serializers dinâmicos
+
+
+no serializers de movie...
+
+
+from actors.serializers import ActorSerializer
+from genres.serializers import GenreSerializer
+
+
+atualize a class MovieListDetailSerializer(serializers.ModelSerializer) para...
+
+# para tratar os dados para o front-end...   
+class MovieListDetailSerializer(serializers.ModelSerializer):
+    genre = GenreSerializer() # usamos um serializer que já existe...
+    actors = ActorSerializer(many=True)
+    rate = serializers.SerializerMethodField(read_only=True)
+    
+    # método para retornar o valor de rate...
+    def get_rate(self, obj):
+        # aggregate cria um campo a mais, no caso stars__avg
+        # ['stars__avg'] o ORM cria uma variável com o nome do campo dunder avg e retorna somente ele
+        # rate busca no model Review related_name='reviews' o campo stars
+        rate = obj.reviews.aggregate(Avg('stars'))['stars__avg']
+            
+        if rate:
+            return round(rate, 1)
+        return None
+    
+    class Meta:
+        model = Movie
+        fields = ['id', 'title', 'genre', 'actors', 'release_date', 'rate', 'resume']
+
+
+o campo rate e o método get_rate foram tranferidos de class MovieSerializer(serializers.ModelSerializer):
+
+que ficou assim agora...
+
+class MovieSerializer(serializers.ModelSerializer):
+        
+    
+    class Meta:
+        model = Movie
+        fields = '__all__'
+    
+      
+        
+    # validações...
+    def validate_release_date(self, value):
+        if value.year < 1990:
+            raise serializers.ValidationError('A data de lançamento não pode ser inferior a 1990')
+        return value
+    
+    def validate_resume(self, value):
+        if len(value) > 200:
+            raise serializers.ValidationError('O tamanho máximo deste campo deve ser 200 caracteres.')
+        return value
+
+
+nas views de movies...
+
+na class MovieRetrieveUpdateDestroyView copie a mesma lógica de class MovieCreateListView...
+
+campos já existentes...
+
+# verifica qual método ta chegando e escolhe qual serializer usar...
+    def get_serializer_class(self):
+        if self.request.method == 'GET':
+            return MovieListDetailSerializer
+        return MovieSerializer
+
+
+
+###########################################################################################
+
+
+Django command
+
+São comandos que chamamos no terminal do django que servem para rodar algum script, rodar alguma automação, etc (exemplos: python manage.py runserver, python manage.py migrate, etc).
+
+Podemos também criar nossos próprios comandos personalizados de acordo com as necessidades do nosso projeto e que roda no contexto do nosso projeto, por exemplo, podemos criar um comand que importa e insere no banco de dados uma lista de atores que está salva num arquivo csv ou excel, sem precisar cadastrar cada item desta lista um a um...
+
+
+********** E como criar um Django command?
+
+antes de criar na prática vamos criar uma estrutura que serve de base...
+
+no app de actors crie...
+
+mkdir actors/management/commands
+
+dentro de management e de commands crie um arquivo __init__py em cada...
+
+dentro de commands crie um arquivo import_actors.py e nele crie o django command de fato...
+
+que fica assim...
+
+
+
+from django.core.management.base import BaseCommand
+
+
+class Command(BaseCommand):
+    
+    def add_arguments(self, parser):
+        parser.add_argument(
+            'file_name',
+            type=str,
+            help='Nome do arquivo com atores.'
+        )
+    
+    def handle(self, *args, **options):
+        file_name = options['file_name']
+        
+        print(f'MEU PRIMEIRO COMMAND: file_name: {file_name}')
+
+
+e para rodar...
+
+python manage.py import_actors actors.csv (o file_name que é um argumento, será o arquivo a ser importado...)
+
+
+
+
+*********** implementando na prática...
+
+
+
+
+atualize o arquivo import_actors para...
+
+
+
+
+import csv
+from datetime import datetime
+from django.core.management.base import BaseCommand
+from actors.models import Actor
+
+
+class Command(BaseCommand):
+    
+    def add_arguments(self, parser):
+        parser.add_argument(
+            'file_name',
+            type=str,
+            help='Nome do arquivo CSV com atores.'
+        )
+    
+    def handle(self, *args, **options):
+        # pega o argumento de add_argument...
+        file_name = options['file_name']
+        
+        # abrindo e lendo linha a linha o arquivo (actors.csv) passado como argumento...
+        with open(file_name, 'r', encoding='utf-8') as file:
+            reader = csv.DictReader(file)
+            for row in reader:
+                name = row['name']
+                birthday = datetime.strptime(row['birthday'], '%Y-%m-%d').date()
+                nationality = row['nationality']
+                
+                # informa cada linha sendo add...
+                self.stdout.write(self.style.NOTICE(name))
+                
+                Actor.objects.create(
+                    name = name,
+                    birthday = birthday,
+                    nationality = nationality
+                )
+        
+        # informa que finalizou o import...      
+        self.stdout.write(self.style.SUCCESS('Atores importados com sucesso!'))
+
+
+e para rodar...
+
+python manage.py import_actors actors.csv
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

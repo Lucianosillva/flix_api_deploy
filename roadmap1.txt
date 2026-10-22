@@ -1,0 +1,282 @@
+Criando nosso projeto flix-api que é catálogo de filmes.
+
+Como de costume num projeto django, crie uma pasta com o nome do projeto, crie o venv, crie um projeto, rode ele pra testar...
+
+dê um migrate...
+
+crie o super user... e configure o idioma e a hora no settings...
+
+crie nosso primeiro endpoint que retorna dados em formato json...
+
+nas urls raiz crie tudo junto mesmo só para demonstrar... e vai mostrar no navegador...
+
+
+from django.contrib import admin
+from django.urls import path
+from django.http import JsonResponse
+
+def hello_view(request):
+    return JsonResponse({'id': 1, 'name': 'Rambo 2', 
+                         'year': 1984})
+
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('hello/', hello_view),
+]
+
+
+instale o postman para manipular a api... use online ou no app dele, ou integrado ao vscode...
+
+para usar, crie um conta, no nosso caso online, crie um workspace com o nosso do projeto, crie um colletion que são as requisições, com o nome que desejar, no nosso caso vai ser do tipo get com o nome de genres que o caminho da url...
+
+usando...
+
+rode o projeto...
+
+no caso de get escolha get, coloque o endpoint na barra e clique em send que vai mostrar os dados... 
+
+
+
+
+******Criando app de gêneros...
+
+
+Apague a view e o endpoint criados na url...
+
+agora crie um app chamado genres, crie o model abaixo...
+
+class Genre(models.Model):
+    name = models.CharField(max_length=200)
+    
+    def __str__(self):
+        return self.name
+
+
+registre no admin e cadastre alguns gêneros por lá...
+
+@admin.register(Genre)
+class GenreAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name',)
+
+
+
+************** Listando gêneros...
+
+crie a url de genres...
+
+from django.urls import path
+from genres.views import genre_view
+
+
+urlpatterns = [
+    path('genres/', genre_view, name='genre-list'),
+   ]
+
+
+crie a view...
+
+from django.http import JsonResponse
+from genres.models import Genre
+
+
+def genre_view(request):
+    genres = Genre.objects.all()
+    # tratando os dados para serem apresentados...
+    data = [{'id': genre.id, 'name': genre.name} for genre in genres]
+    return JsonResponse(data, safe=False)
+
+pronto, agora faça um get no postman com o endpoint /genres/
+
+
+
+
+***********Criando gêneros...
+
+
+na urls mude o name para genre...
+
+
+vamos criar um endpoint de post, usando a mesma url, vai ter um if na view com opção de get ou post...
+
+atualize  a view para...
+
+import json
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from genres.models import Genre
+
+
+@csrf_exempt
+def genre_view(request):
+    if request.method == 'GET':
+        genres = Genre.objects.all()
+        # tratando os dados para serem apresentados...
+        data = [{'id': genre.id, 'name': genre.name} for genre in genres]
+        return JsonResponse(data, safe=False)
+    elif request.method == 'POST':
+        data = json.loads(request.body.decode('utf-8'))
+        new_genre = Genre(name=data['name'])
+        new_genre.save()
+        return JsonResponse({'id': new_genre.id,
+                             'name': new_genre.name},
+                            status=201)
+
+
+no postman crie uma nova requisição do tipo post com o mesmo endpoint,  nomeie e salve...
+
+clique em body, raw, json...
+
+escreva o conteúdo no formato json...
+
+{
+    "name": "suspense"
+}
+
+clique em send, e vai retornar o objeto criado e com status 201...
+
+dê um get e verá o dado criado junto com os outros...
+
+
+
+
+****************Detalhe de gênero...
+
+
+altere o nome da view para genre_create_list_view, na url também...
+
+
+crie uma nova url para busca um objeto específico e depois também para atualizar e deletar...
+
+ path('genres/<int:pk>/', genre_detail_view, name='genre-detail-view'),
+
+
+crie uma nova view...
+
+
+import json
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.shortcuts import get_object_or_404
+from genres.models import Genre
+
+
+@csrf_exempt
+def genre_detail_view(request, pk):
+    genre = get_object_or_404(Genre, pk=pk)
+    data = {'id': genre.id, 'name': genre.name}
+    return JsonResponse(data)
+
+
+no postman...
+
+crie um nova requisição do tipo get...
+
+na barra coloque...
+
+http://127.0.0.1:8000/genres/2, por exemplo
+
+
+
+***************Atualizando gênero...
+
+vamos usar a mesma view e url de detail...
+
+na view vamos fazer um if com opção de get ou put...
+
+que fica assim...
+
+@csrf_exempt
+def genre_detail_view(request, pk):
+    genre = get_object_or_404(Genre, pk=pk)
+    
+    if request.method == 'GET':
+        data = {'id': genre.id, 'name': genre.name}
+        return JsonResponse(data)   
+    elif request.method == 'PUT':
+        data = json.loads(request.body.decode('utf-8'))
+        genre.name = data['name']
+        genre.save()
+        return JsonResponse(
+            {'id': genre.id,
+                             'name': genre.name}
+        )
+
+
+no postamam crie uma nova requisição nomeie salve, e na barra coloque tipo...
+
+http://127.0.0.1:8000/genres/1/
+
+send e pronto vai estar alterado o objeto e mostrado a alteração...
+
+
+
+***********Deletando gênero...
+
+
+a url e a view continuam a mesma, só que com o método put...
+
+atualize a view para...
+
+
+@csrf_exempt
+def genre_detail_view(request, pk):
+    genre = get_object_or_404(Genre, pk=pk)
+    
+    if request.method == 'GET':
+        data = {'id': genre.id, 'name': genre.name}
+        return JsonResponse(data)
+       
+    elif request.method == 'PUT':
+        data = json.loads(request.body.decode('utf-8'))
+        genre.name = data['name']
+        genre.save()
+        return JsonResponse(
+            {'id': genre.id,
+                             'name': genre.name}
+        )
+        
+    elif request.method == 'DELETE':
+        genre.delete()
+        return JsonResponse({
+            'message': 'Gênero deletado com sucesso.'
+        }
+                            )
+
+
+
+
+no postamam crie uma nova requisição nomeie salve, e na barra coloque tipo...
+
+http://127.0.0.1:8000/genres/1/
+
+send e pronto vai estar deletado o objeto e mostrado a alteração...
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

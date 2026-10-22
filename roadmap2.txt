@@ -1,0 +1,453 @@
+DJANGO REST FRAMEWORK
+
+
+
+********* instalando e configurando do DRF...
+instal o DRF com...
+
+pip install djangorestframework
+
+no installed apps do settings...
+
+rest_framework
+
+depois de instalado podemos também fazer as requisições pelo navegador, usando a url correspondente.
+
+
+
+##########################################
+
+
+
+
+**************** Sobre generic views do DRF
+
+
+APIView é a forma mais genérica de view de uma API. Ela te dá total liberdade: você escreve o `get`, o `post`, o `put` e o `delete` na mão, do jeito que quiser 3. Ela não traz os métodos prontos — a ideia é justamente "faz do jeito que você quiser, se vira" . Você importa com `from rest_framework import views` e herda de `views.APIView` 3.
+
+Generic views são o oposto em termos de conveniência. Elas já vêm com as operações do CRUD implementadas, uma para cada tipo: `CreateAPIView` (só cria, método post), `ListAPIView` (lista, get), `RetrieveAPIView` (detalhe, get), `DestroyAPIView` (delete) e `UpdateAPIView` (patch e put) 1. Você importa com `from rest_framework import generics` .
+
+E tem um detalhe bacana: o DRF também traz versões que mesclam essas operações, para você ter menos endpoints. A `ListCreateAPIView`, por exemplo, já faz list e create no mesmo endpoint, com o get e o post prontos . E a `RetrieveUpdateDestroyAPIView` faz retrieve, update e destroy de uma vez 6.
+
+Resumindo a diferença de espírito: a APIView te entrega o controle total e nada pronto; as generics fazem o trabalho por você — você só diz qual model e qual serializer usar .
+
+
+
+####################################################################
+
+
+********** List create view e serializer
+
+nas views comente def genre_create_list_view
+
+importe 
+
+from rest_framework import generics
+
+crie...
+
+class GenreCreateListView(generics.ListCreateAPIView):
+    queryset = Genre.objects.all()
+    serializer_class = GenreSerializer
+
+
+dentro da pasta genres crie serializers.py com...
+
+from rest_framework import serializers
+from genres.models import Genre
+
+
+class GenreSerializer(serializers.ModelSerializer):
+    
+    class Meta:
+        model = Genre
+        fields = '__all__'
+
+na urls de genres apague a view antiga e coloque GenreCreateListView
+
+altere também a url para GenreCreateListView.as_view()
+
+
+volte nas vies e importe...
+
+ from genres.serializers import GenreSerializer
+
+
+pronto, com essa view podemos listar e criar...
+
+
+#########################################################################################
+
+
+*********** Retrieve update destroy
+
+
+nas views comente ou delete as importações desnecessárias e a view def genre_create_list_view
+
+
+crie...
+
+class GenreRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Genre.objects.all()
+    serializer_class = GenreSerializer
+
+
+nas urls de genres...
+
+importe GenreRetrieveUpdateDestroyView
+
+
+altere a url para  GenreRetrieveUpdateDestroyView.as_view()
+
+
+pronto, com isso podemos dar retrieve, update, delete...
+
+
+
+##############################################################################
+
+
+******************** App actors e choice fields
+
+crie um novo app chamado actors e registre no settings...
+
+crie o model dele...
+
+# opções do choice pra ser usado no campo nationality...
+NATIONALITY_CHOICES = (
+    ('USA', 'Estados Unidos'),
+    ('BRAZIL', 'Brasil')
+)
+
+class Actor(models.Model):
+    name = models.CharField(max_length=200)
+    birthday = models.DateField(blank=True, null=True)
+    nationality = models.CharField(max_length=100, blank=True, null=True,
+                                   choices=NATIONALITY_CHOICES)
+    
+    def __str__(self):
+        return self.name
+
+
+
+#####################################################################################
+
+
+CRUD completo de actors
+
+
+nas views de actors...
+
+from rest_framework import generics
+from actors.models import Actor
+from actors.serializers import ActorSerializer
+
+
+class ActorCreateListView(generics.ListCreateAPIView):
+    queryset = Actor.objects.all()
+    serializer_class = ActorSerializer
+    
+    
+class ActorRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Actor.objects.all()
+    serializer_class = ActorSerializer
+
+
+crie o serializer de actors...
+
+from rest_framework import serializers
+from actors.models import Actor
+
+
+class ActorSerializer(serializers.ModelSerializer):
+    
+    class Meta:
+        model = Actor
+        fields = '__all__'
+
+
+nas urls de actors...
+
+from django.urls import path
+from actors.views import ActorCreateListView, ActorRetrieveUpdateDestroyView
+
+
+urlpatterns = [
+    path('actors/', ActorCreateListView.as_view(), name='actors'),
+    path('actors/<int:pk>/', ActorRetrieveUpdateDestroyView.as_view(), name='actors-detail-view'),
+]
+
+na url raiz aponte pra essa url (de actors)...
+
+
+
+#################################################################################
+
+
+Admin de actors...
+
+from django.contrib import admin
+from actors.models import Actor
+
+
+@admin.register(Actor)
+class ActorAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'birthday', 'nationality')
+
+
+
+####################################################################################
+
+
+App movies e many to many fields
+
+
+crie o app movies e registre no settings...
+
+crie o models dele...
+
+from django.db import models
+from actors.models import Actor
+from genres.models import Genre
+
+
+class Movie(models.Model):
+    title = models.CharField(max_length=500)
+    genre = models.ForeignKey(Genre, on_delete=models.PROTECT,
+                               related_name='movies')
+    release_date = models.DateField(null=True, blank=True)
+    actors = models.ManyToManyField(Actor, related_name='movies')
+    resume = models.TextField(blank=True, null=True)
+    
+    def __str__(self):
+        return self.title
+
+
+##################################################################################
+
+
+CRUD completo de movies
+
+nas views de movies...
+
+from rest_framework import generics
+from movies.models import Movie
+from movies.serializers import MovieSerializer
+
+
+class MovieCreateListView(generics.ListCreateAPIView):
+    queryset = Movie.objects.all()
+    serializer_class = MovieSerializer
+    
+    
+class MovieRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Movie.objects.all()
+    serializer_class = MovieSerializer
+
+
+crie o serializer de movies...
+
+from rest_framework import serializers
+from movies.models import Movie
+
+
+class MovieSerializer(serializers.ModelSerializer):
+    
+    
+    class Meta:
+        model = Movie
+        fields = '__all__'
+
+
+crie as urls de movies e aponte para elas na url raiz...
+
+from django.urls import path
+from movies.views import MovieCreateListView, MovieRetrieveUpdateDestroyView
+
+
+urlpatterns = [
+    path('movies/', MovieCreateListView.as_view(), name='movie-create-list'),
+    path('movies/<int:pk>/', MovieRetrieveUpdateDestroyView.as_view(), name='movie-detail-view'),
+]
+
+
+
+#####################################################################
+
+
+ Admin de movies
+
+
+ from django.contrib import admin
+from movies.models import Movie
+
+
+@admin.register(Movie)
+class MovieAdmin(admin.ModelAdmin):
+    list_display = ('id', 'title', 'genre', 'release_date', 'resume')
+
+
+###############################################################################
+
+
+App reviews e validators
+
+
+crie o app reviews e registre no settings...
+
+
+no models dele...
+
+
+from django.db import models
+from django.core.validators import MinValueValidator, MaxValueValidator
+from movies.models import Movie
+
+
+class Review(models.Model):
+    movie = models.ForeignKey(Movie, on_delete=models.PROTECT,
+                              related_name='reviews')
+    stars = models.IntegerField(
+        validators=[
+            MinValueValidator(0, 'Avaliação não pode ser inferior a 0 estreals.'),
+            MaxValueValidator(5, 'Avaliação não pode ser superior a 5 estrelas.'),
+        ]
+    )
+    comment = models.TextField(null=True, blank=True)
+    
+    
+    def __str__(self):
+        return self.movie 
+
+
+##########################################################################
+
+
+
+CRUD completo de reviews
+
+
+nas views de reviews...
+
+
+from rest_framework import generics
+from reviews.models import Review
+from reviews.serializers import ReviewSerializer
+
+
+class ReviewCreateListView(generics.ListCreateAPIView):
+    queryset = Review.objects.all()
+    serializer_class = ReviewSerializer
+    
+    
+class ReviewRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Review.objects.all()
+    serializer_class = ReviewSerializer
+
+
+
+dentro do app reviews crie serializers.py e nele...
+
+from rest_framework import serializers
+from reviews.models import Review
+
+
+class ReviewSerializer(serializers.ModelSerializer):
+    
+    class Meta:
+        model = Review
+        fields = '__all__'
+
+
+crie as urls de reviews e aponte pra elas nas urls raiz...
+
+from django.urls import path
+from reviews.views import ReviewCreateListView, ReviewRetrieveUpdateDestroyView
+
+
+urlpatterns = [
+    path('reviews/', ReviewCreateListView.as_view(), name='review-create-list'),
+    path('reviews/<int:pk>/', ReviewRetrieveUpdateDestroyView.as_view(), name='review-detail-view'),
+]
+
+
+
+#################################################################################
+
+
+Admin de reviews...
+
+from django.contrib import admin
+from reviews.models import Review
+
+
+@admin.register(Review)
+class ReviewAdmin(admin.ModelAdmin):
+    list_display = ('id', 'movie', 'stars', 'comment')
+
+
+
+#########################################################################################
+
+Versionamento de URLs e recursos
+
+como boa prática de um projeto django cada app do nosso projeto terá um arquivo urls.py com suas devidas urls e dentro da url raiz vai estar apontando para o arquivo de url de cada app.
+no nosso caso essa parte já foi feita.
+
+
+
+como ficaria o arquivo de url de cada app...
+
+
+
+from django.urls import path
+from movies.views import MovieCreateListView, MovieRetrieveUpdateDestroyView
+
+
+urlpatterns = [
+    path('movies/', MovieCreateListView.as_view(), name='movie-create-list'),
+    path('movies/<int:pk>/', MovieRetrieveUpdateDestroyView.as_view(), name='movie-detail-view'),
+]
+
+
+agora como ficaria o url raiz e com o versionamento que serve para quando for lançada uma versão nova da api, a antiga vai continuar funcionando sem quebrar...
+
+
+
+from django.contrib import admin
+from django.urls import path, include
+
+
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('api/v1/', include('genres.urls')),
+    path('api/v1/', include('actors.urls')),
+    path('api/v1/', include('movies.urls')),
+    path('api/v1/', include('reviews.urls')),
+   ]
+
+
+agora pra acessar os recursos (url) da api tem que colocar o prefixo, ou seja api/v1 mais o restante da url por exemple http://127.0.0.1:8000/api/v1/reviews/
+ou http://127.0.0.1:8000/api/v1/reviews/1/ se for o caso...
+
+
+e se for fazer modificações significativas na api pode-se criar uma nova versão...
+
+crie um novo arquivo de urls no app tipo urls_v2.py e nele coloque as urls que desejar...
+
+
+na url raiz faça um novo include apontando para o novo arquivo de url...
+
+ path('api/v2/', include('reviews.urls_v2.py')),
+
+
+
+
+
+
+
+
+
+
+
+

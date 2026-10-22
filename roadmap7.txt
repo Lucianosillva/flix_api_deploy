@@ -1,0 +1,23 @@
+Deploy do projeto...
+
+
+
+no settings do projeto...
+
+
+import os
+
+
+ALLOWED_HOSTS = ['*'] # por enquanto...
+
+
+STATIC_ROOT = os.path(BASE_DIR, 'staticfiles')
+
+
+# sobreescrevendo algumas configurações do jwt...
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(days=1),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+}
+
