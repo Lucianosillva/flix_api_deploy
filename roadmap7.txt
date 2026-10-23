@@ -21,3 +21,57 @@ SIMPLE_JWT = {
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
 }
 
+
+
+
+crie o .gitignore, se não tiver ainda...
+
+
+
+venv/
+
+__pycache__/
+
+*.sqlite3
+
+
+crie o proejeto no github, projeto público para não precisar configurar ssh key...
+
+suba o projeto pro github...
+
+
+###################################################################################
+
+clonando e instalando as dependencias do projeto no servidor da pythonanywhere...
+
+os comandos a seguir também podem ser encontrados em:
+
+https://help.pythonanywhere.com/pages/DeployExistingDjangoProject/
+
+no painel da pythonanywhere na aba console, clique em bash e já vai abrir terminal do servidor...
+
+clone o projeto do github...
+
+na opção https porque o repo é público, se fosse privado precisaria de configurar uma chave ssh...
+
+https://github.com/Lucianosillva/flix_api_deploy.git
+
+crie uma virtualenv...
+
+mkvirtualenv --python=/usr/bin/python3.10 mysite-virtualenv
+
+depois de criada ela já ativa, e depois, se localize na pasta do projeto...
+
+instale as dependencias...
+
+pip install -r requirements.txt
+
+
+###############################################################################################
+
+
+ Configurando a aplicação
+
+ 
+
+
