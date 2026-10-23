@@ -11,7 +11,7 @@ import os
 ALLOWED_HOSTS = ['*'] # por enquanto...
 
 
-STATIC_ROOT = os.path(BASE_DIR, 'staticfiles')
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 
 # sobreescrevendo algumas configurações do jwt...
@@ -66,12 +66,97 @@ instale as dependencias...
 
 pip install -r requirements.txt
 
+rode...
+
+python manage.py collectstatic (para indicar onde estão os arquivos estáticos)
+
 
 ###############################################################################################
 
 
  Configurando a aplicação
 
- 
+ no painel da pythonanywhere, na aba web...
+
+ clique em add a new web app, nisso já mostra o link da aplicação, tipo...
+
+ seu_usuario.pythonanywhere.com (conta grátis não permite domínio personalizado)
+
+ clique em next...
+
+ clique em manual configuration... e next...
+
+ set onde tá o código fonte do projeto... em source code... tipo...
+
+
+ /home/Lucianosillva/flix_api_deploy
+
+
+
+ clique no link de uwsgi e configure o arquivo assim...
+
+ comente def application...
+
+
+ encontre o trecho do DJANGO e deixe assim... indicando o cominho do código fonte e caminho do settings...
+
+
+ # +++++++++++ DJANGO +++++++++++
+# To use your own django app use code like this:
+import os
+import sys
+
+
+path = '/home/Lucianosillva/flix_api_deploy'
+if path not in sys.path:
+    sys.path.append(path)
+
+os.environ['DJANGO_SETTINGS_MODULE'] = 'app.settings'
+
+
+from django.core.wsgi import get_wsgi_application
+application = get_wsgi_application()
+
+
+salve e feche, voltando pro painel de configuração dê um reload...
+
+
+********** configure a virtualenv...
+
+no campo coloque o nome dela...
+
+
+****** configure o staticfiles...
+
+em diretory...
+
+/home/Lucianosillva/flix_api_deploy/staticfiles 	 
+
+na url...
+
+/static/
+
+***** em sucurity...
+
+deixe enable o force https...
+
+dê reload novamente...
+
+teste com o link do projeto...
+
+Lucianosillva.pythonanywhere.com 
+
+e vai mostrar as urls do projeto, entre na url de admin e vai aparece a tela de login...
+
+
+#########################################################################################
+
+mudar no settings pra Deploy???
+
+
+
+
+
+
 
 
